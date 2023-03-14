@@ -17,22 +17,14 @@ mariadb_warn() {
 }
 mariadb_error() {
   mariadb_log ERROR "$@" >&2
+  exit 1
 }
 
 docker_process_init_files() {
     mysql=(docker_process_sql)
 
-    echo
-
-    local f
-    for f; do
-        if [[ "$f" =~ \.sql$ ]]; then
-            mariadb_note "$0: running $f"
-            docker_process_sql < "$f"
-            echo
-        else
-            mariadb_warn "$0: ignoring $f"
-        fi
+    for sql_file in "$1"/*.sql; do
+      docker_process_sql < "$sql_file"
     done
 }
 
@@ -90,7 +82,6 @@ docker_process_sql() {
 
 # Set the positional parameters for the script to "mysql" followed by any additional arguments
 _main() {
-#  set -- mysqld "$@"
   docker_setup_env
   if [ -z "$DATABASE_ALREADY_EXISTS" ]; then
     # check dir permissions to reduce likelihood of half-initialized database
@@ -100,7 +91,7 @@ _main() {
     docker_temp_server_start "$@"
     mariadb_note "Temporary server started."
 
-    docker_process_init_files /tmp/mariadb/conf/*
+    docker_process_init_files /tmp/mariadb/conf
 
     mariadb_note "Stopping temporary server"
     docker_temp_server_stop
