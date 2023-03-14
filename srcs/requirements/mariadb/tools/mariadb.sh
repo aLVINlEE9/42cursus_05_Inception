@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -x
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 RESET='\033[0m'
@@ -17,15 +17,34 @@ mariadb_warn() {
 }
 mariadb_error() {
   mariadb_log ERROR "$@" >&2
-  exit 1
 }
+
+docker_process_init_files() {
+    mysql=(docker_process_sql)
+
+    echo
+
+    local f
+    for f; do
+        if [[ "$f" =~ \.sql$ ]]; then
+            mariadb_note "$0: running $f"
+            docker_process_sql < "$f"
+            echo
+        else
+            mariadb_warn "$0: ignoring $f"
+        fi
+    done
+}
+
 
 docker_temp_server_start() {
   "$@" &
+  ps
   declare -g MARIADB_PID
 	MARIADB_PID=$!
 	mariadb_note "Waiting for server startup"
   local i
+  whoami
   for i in {30..0}; do
     if docker_process_sql --database=mysql <<<'SELECT 1' &> /dev/null; then
       break
@@ -37,12 +56,17 @@ docker_temp_server_start() {
   fi
 }
 
+docker_temp_server_stop() {
+	kill "$MARIADB_PID"
+	wait "$MARIADB_PID"
+}
+
 docker_setup_env() {
   # Get config
   declare -g SOCKET DATADIR MARIADB_DATABASE
   MARIADB_DATABASE="wp_db" # need to change
-  DATADIR="/var/lib/mysql" + "$MARIADB_DATABASE"
-  SOCKET="/var/run/mysqld"
+  DATADIR="/var/lib/mysql/$MARIADB_DATABASE"
+  SOCKET="/var/run/mysqld/mysqld.sock"
 
   # Initialize values that might be stored in a file
   declare -g MARIADB_ROOT_USER MARIADB_ROOT_PASSWORD
@@ -61,22 +85,34 @@ docker_exec_client() {
 }
 
 docker_process_sql() {
-  docker_exec_client "$@"
+  MYSQL_PWD=$MARIADB_ROOT_PASSWORD docker_exec_client "$@"
 }
 
 # Set the positional parameters for the script to "mysql" followed by any additional arguments
 _main() {
-  set -- mysql "$@"
+#  set -- mysqld "$@"
   docker_setup_env
   if [ -z "$DATABASE_ALREADY_EXISTS" ]; then
     # check dir permissions to reduce likelihood of half-initialized database
-    ls /docker-entrypoint-initdb.d/ > /dev/null
+    ls /tmp/mariadb/conf/ > /dev/null
 
     mariadb_note "Starting temporary server"
     docker_temp_server_start "$@"
     mariadb_note "Temporary server started."
 
+    docker_process_init_files /tmp/mariadb/conf/*
+
+    mariadb_note "Stopping temporary server"
+    docker_temp_server_stop
+    mariadb_note "Temporary server stopped"
+
+    echo
+    mariadb_note "MariaDB init process done. Ready for start up."
+    echo
   else
     mariadb_warn "${MARIADB_DATABASE} already exists"
+  fi
+  exec "$@"
 }
 
+_main "$@"
