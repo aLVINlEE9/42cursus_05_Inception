@@ -1,0 +1,25 @@
+version: "3"
+
+services:
+  mariadb:
+    container_name: mariadb
+    build: ./requirements/mariadb
+    image: mariadb
+    env_file: .env
+    volumes:
+      - mariadb:/var/lib/mysql
+    networks:
+      - inception_net
+    restart: always
+    tty: true
+
+networks:
+  inception_net: { }
+
+volumes:
+  mariadb:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /Users/alvinlee/data/mariadb
