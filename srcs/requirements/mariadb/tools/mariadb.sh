@@ -55,15 +55,9 @@ docker_temp_server_stop() {
 
 docker_setup_env() {
   # Get config
-  declare -g SOCKET DATADIR MARIADB_DATABASE
-  MARIADB_DATABASE="wp_db" # need to change
+  declare -g SOCKET DATADIR
   DATADIR="/var/lib/mysql/$MARIADB_DATABASE"
   SOCKET="/var/run/mysqld/mysqld.sock"
-
-  # Initialize values that might be stored in a file
-  declare -g MARIADB_ROOT_USER MARIADB_ROOT_PASSWORD
-  MARIADB_ROOT_USER='root'
-  MARIADB_ROOT_PASSWORD='1234'
 
   # Check database exist
   declare -g DATABASE_ALREADY_EXISTS
